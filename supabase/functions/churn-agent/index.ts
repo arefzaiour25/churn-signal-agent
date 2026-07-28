@@ -182,7 +182,15 @@ async function assessWithClaude(rawInput: string, precedents: PastCase[], attemp
 // TEIL C — Webhook-Handler
 // ==========================================================================
 
+// Erlaubt den Aufruf aus dem Browser (z.B. von der Demo-Seite)
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Nur POST erlaubt" }, 405);
 
   try {
@@ -258,6 +266,6 @@ Deno.serve(async (req) => {
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...CORS },
   });
 }

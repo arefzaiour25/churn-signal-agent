@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Churn-Signal-Agent — Demo</title>
+<style>
+  :root { --bg:#0f1420; --card:#1a2130; --line:#2b3446; --txt:#e7ecf3; --muted:#93a0b4; --accent:#5b8cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--txt); }
+  .wrap { max-width:820px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 24px; font-size:14px; }
+  .btns { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:24px; }
+  button { cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--txt);
+           padding:12px 16px; border-radius:10px; font-size:14px; font-weight:600; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .result { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; display:none; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+  .badge { padding:6px 12px; border-radius:999px; font-size:13px; font-weight:700; }
+  .low{background:#123524;color:#4ade80} .medium{background:#3a3312;color:#facc15}
+  .high{background:#3a2412;color:#fb923c} .critical{background:#3a1218;color:#f87171}
+  .kv { font-size:13px; color:var(--muted); background:#0f1420; border:1px solid var(--line); padding:6px 10px; border-radius:8px; }
+  .kv b { color:var(--txt); }
+  h3 { font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:18px 0 8px; }
+  ul { margin:0; padding-left:18px; } li { margin:4px 0; font-size:14px; }
+  .rec { font-size:15px; line-height:1.5; }
+  .case { border-left:3px solid var(--accent); padding:8px 12px; margin:8px 0; background:#0f1420; border-radius:6px; font-size:13px; }
+  .case b { color:var(--txt); } .case span { color:var(--muted); }
+  details { margin-top:18px; } summary { cursor:pointer; color:var(--muted); font-size:13px; }
+  pre { background:#0b0f18; border:1px solid var(--line); padding:14px; border-radius:8px; overflow:auto; font-size:12px; }
+  .err { color:#f87171; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Churn-Signal-Agent</h1>
+  <p class="sub">Klick einen Kunden an — der Webhook bewertet ihn live und speichert das Ergebnis in Supabase.</p>
+
+  <div class="btns">
+    <button onclick="run(0)">Input 1 · Bäckerei Landmann</button>
+    <button onclick="run(1)">Input 2 · Kfz-Werkstatt Berger</button>
+    <button onclick="run(2)">Input 3 · Metallbau Sudholt</button>
+  </div>
+
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+const URL = "https://anndhkoaruuirnguhkgm.supabase.co/functions/v1/churn-agent";
+
+const INPUTS = [
+`Kunde: Bäckerei Landmann GmbH
+ARR: 3.400 EUR
+Signale:
+- Support-Ticket vom 12.06.: "Wir bekommen kaum noch Bewerbungen über eure Plattform, das war mal anders."
+- Nutzung: keine neue Stellenanzeige seit 9 Wochen, vorher im Schnitt 2 pro Monat.
+- E-Mail des Geschäftsführers: "Bitte schickt mir mal eine Übersicht, was wir bei euch eigentlich monatlich zahlen."`,
+`Kunde: Kfz-Werkstatt Berger
+ARR: 780 EUR
+Signale:
+- Support-Ticket vom 03.06.: "Login hat kurz nicht funktioniert, geht jetzt wieder."
+- Nutzung: eine neue Anzeige letzte Woche geschaltet.`,
+`Kunde: Metallbau Sudholt
+ARR: unbekannt
+Signale:
+- Telefonnotiz: "Kunde sehr zufrieden mit letzter Kampagne, lobt Bewerberqualität."
+- Support-Ticket vom 10.06.: "Ihr habt versprochen zurückzurufen, ist nie passiert. Langsam überlege ich, ob sich das noch lohnt."`
+];
+
+const box = document.getElementById("result");
+
+async function run(i) {
+  const buttons = document.querySelectorAll("button");
+  buttons.forEach(b => b.disabled = true);
+  box.style.display = "block";
+  box.innerHTML = "<p style='color:var(--muted)'>⏳ Der Agent bewertet den Kunden …</p>";
+  try {
+    const res = await fetch(URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: INPUTS[i] })
+    });
+    const data = await res.json();
+    render(data.assessment);
+  } catch (e) {
+    box.innerHTML = "<p class='err'>Fehler: " + e.message + "</p>";
+  } finally {
+    buttons.forEach(b => b.disabled = false);
+  }
+}
+
+function render(a) {
+  const arr = a.arr === null ? "unbekannt" : a.arr + " €";
+  const risk = a.arr_at_risk === null ? "—" : a.arr_at_risk + " €";
+  const esc = a.escalation_tier || "—";
+  const sig = (a.signals_detected||[]).map(s => "<li>"+s+"</li>").join("");
+  const sim = (a.similar_cases||[]).map(c =>
+    "<div class='case'><b>"+c.customer+"</b> → "+c.outcome+"<br><span>"+c.relevance+"</span></div>").join("")
+    || "<span style='color:var(--muted)'>keine</span>";
+
+  box.innerHTML = `
+    <div class="row">
+      <span class="badge ${a.risk_level}">${a.risk_level.toUpperCase()} · Score ${a.churn_risk_score}</span>
+      <span class="kv">Confidence: <b>${a.confidence}</b></span>
+      <span class="kv">ARR: <b>${arr}</b></span>
+      <span class="kv">ARR at risk: <b>${risk}</b></span>
+      <span class="kv">Eskalation: <b>${esc}</b></span>
+    </div>
+    <h3>Kunde</h3><div>${a.customer_name}</div>
+    <h3>Erkannte Signale</h3><ul>${sig}</ul>
+    <h3>Empfehlung</h3><div class="rec">${a.recommended_action}</div>
+    <h3>Begründung</h3><div class="rec">${a.reasoning}</div>
+    <h3>Ähnliche Alt-Fälle (Retrieval)</h3>${sim}
+    <details><summary>Rohes JSON (in Supabase gespeichert)</summary><pre>${JSON.stringify(a,null,2)}</pre></details>
+  `;
+}
+</script>
+</body>
+</html>
