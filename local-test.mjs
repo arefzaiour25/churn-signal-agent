@@ -60,7 +60,7 @@ Regeln:
 - churn_risk_score: 0-100. Grobe Bänder: 0-24 low, 25-49 medium, 50-74 high, 75-100 critical. risk_level muss zum Score passen.
 - signals_detected: die konkreten Warnsignale, die du IM TEXT erkennst (kurze Stichpunkte). Nur was wirklich dasteht.
 - recommended_action: eine konkrete nächste Handlung (ein Satz), umsetzbar für Customer Success.
-- confidence: Wie sicher bist du dir? Bei WENIGEN oder WIDERSPRÜCHLICHEN Signalen -> "low". Bei klaren, eindeutigen Signalen -> "high". Lieber ehrlich unsicher als falsch selbstbewusst.
+- confidence: Wie sicher bist du dir? Bei klaren, eindeutigen Signalen -> "high". Bei nur EINEM Signal oder dünner Faktenlage -> maximal "low". Wenn sich Signale AKTIV WIDERSPRECHEN (z.B. ein klar positives und ein klar negatives Signal gleichzeitig) -> höchstens "low". Lieber ehrlich unsicher als falsch selbstbewusst.
 - reasoning: 1-2 Sätze, warum du zu dieser Einschätzung kommst.
 
 Wichtig:
@@ -144,6 +144,12 @@ async function run(rawInput) {
   const customer_name = parseCustomerName(rawInput); // Code
   const model = await assessWithClaude(rawInput);    // Modell
 
+  // Code-Sicherheitsnetz: dünne Signallage kann nicht "high" sein.
+  const confidence =
+    model.signals_detected.length < 2 && model.confidence === "high"
+      ? "low"
+      : model.confidence;
+
   return {
     customer_name,
     churn_risk_score: model.churn_risk_score,
@@ -153,8 +159,8 @@ async function run(rawInput) {
     arr_at_risk: arr, // = ARR wenn bekannt, sonst null (nicht raten)
     recommended_action: model.recommended_action,
     escalation_tier: escalationTier(arr), // Code
-    similar_cases: [], // Ausbaustufe A folgt
-    confidence: model.confidence,
+    similar_cases: [], // Retrieval steckt in der Edge Function (Ausbaustufe A)
+    confidence,
     reasoning: model.reasoning,
     model: MODEL,
   };
