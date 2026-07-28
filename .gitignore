@@ -1,0 +1,12 @@
+# Secrets – NIEMALS committen
+.env
+.env.local
+supabase/.env
+
+# Supabase CLI
+supabase/.branches
+supabase/.temp
+
+# System
+.DS_Store
+node_modules/
