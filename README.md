@@ -37,10 +37,19 @@ POST (curl / Make / n8n)
 5. **Modellwahl Sonnet:** Die harten Fälle sind reine Urteilsfragen (dünne/widersprüchliche
    Signale) — dort ist Sonnet robuster als Haiku. Kosten sind bei diesem Volumen vernachlässigbar.
 
-## Ausbaustufe
+## Ausbaustufe A (Retrieval) — gebaut
 
-Gebaut: **A (Retrieval)** — siehe unten. **B (CRM-Rückschreiben)** wird im Gespräch als
-Design-Frage besprochen.
+In `past_cases` liegen abgeschlossene Alt-Fälle (Kunde, Situation, Ausgang). Bei jedem Lauf
+findet der Code per **Stichwort-Überlappung** die 1–2 ähnlichsten Fälle, gibt sie Claude als
+Kontext mit (erdet die Empfehlung) und legt sie strukturiert in `similar_cases` ab.
+
+Bewusst simpel gehalten (kein pgvector, wie im Case erlaubt). Für Produktion wäre der nächste
+Schritt semantische Ähnlichkeit über Embeddings (pgvector) statt reiner Wort-Überschneidung —
+das fängt Synonyme/Umschreibungen, die die Stichwort-Suche verpasst.
+
+**Ausbaustufe B (CRM-Rückschreiben)** wurde nicht gebaut, wird im Gespräch als Design-Frage
+besprochen: Ergebnis (Risiko + Empfehlung + Eskalationsstufe) per Upsert an den Kundendatensatz
+in Salesforce / einem Mock-CRM zurückschreiben, idempotent über eine externe Kunden-ID.
 
 ---
 
